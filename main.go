@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 	"os"
-	"time"
 	"strings"
+	"time"
 
 	agenttool "cowrie-report-agent/tool"
 
@@ -46,9 +46,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	sleepch := make(chan string)
+
 	tools := []tool.BaseTool{
 		agenttool.NewCurrentTimeTool(),
-		agenttool.NewSleepTool(),
+		agenttool.NewSleepTool(sleepch),
 		agenttool.NewPgQueryTool(dbpool),
 		agenttool.NewGotifySendTool(
 			os.Getenv("GOTIFY_URL"),
