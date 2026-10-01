@@ -38,9 +38,7 @@ func main() {
 		APIKey:  os.Getenv("OPENAI_API_KEY"),
 		Model:   os.Getenv("OPENAI_MODEL"),
 		BaseURL: os.Getenv("OPENAI_BASE_URL"),
-		ByAzure: func() bool {
-			return os.Getenv("OPENAI_BY_AZURE") == "true"
-		}(),
+		ReasoningEffort: openai.ReasoningEffortLevelMedium,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -49,6 +47,10 @@ func main() {
 	tools := []tool.BaseTool{
 		agenttool.NewCurrentTimeTool(),
 		agenttool.NewPgQueryTool(dbpool),
+		agenttool.NewGotifySendTool(
+			os.Getenv("GOTIFY_URL"),
+			os.Getenv("GOTIFY_TOKEN"),
+		),
 	}
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
