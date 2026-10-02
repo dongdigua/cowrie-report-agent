@@ -12,7 +12,7 @@ import (
 )
 
 type PgQueryInput struct {
-	SQL string `json:"sql" jsonschema:"required,description=要执行的 SELECT SQL 语句"`
+	SQL string `json:"sql" jsonschema:"required,description=要执行的 SQL 语句"`
 }
 
 type PgQueryOutput struct {

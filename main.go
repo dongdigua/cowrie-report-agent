@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
+	"cowrie-report-agent/dbmonitor"
 	agenttool "cowrie-report-agent/tool"
 
 	"github.com/joho/godotenv"
@@ -46,24 +48,30 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sleepch := make(chan string)
+	datach := make(chan string, 1)
+	finishch := make(chan string)
+
+	go dbmonitor.DbMonitor(ctx, dbpool, datach)
 
 	tools := []tool.BaseTool{
 		agenttool.NewCurrentTimeTool(),
-		agenttool.NewSleepTool(sleepch),
+		agenttool.NewSleepTool(datach),
 		agenttool.NewPgQueryTool(dbpool),
 		agenttool.NewGotifySendTool(
 			os.Getenv("GOTIFY_URL"),
 			os.Getenv("GOTIFY_TOKEN"),
 		),
+		agenttool.NewFinishSessionTool(finishch),
 	}
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name:        "cowrie_agent",
 		Description: "A friendly greeting assistant",
-		// Instruction: "你是一位安全审计专家，需要从 cowrie 数据库中总结近期威胁情报并对比历史情报，研判高危事件。查询内容时一定要加 LIMIT，不要全量查询。最后生成用于上报给网信部门的简要报告。若有正在进行中的攻击，根据攻击频率自行决定是否产生报告和下一次查询数据库的时间",
-		Instruction: "你是一位安全审计专家，需要从 cowrie 数据库中(查询内容时要加 LIMIT，不要全量查询)总结近期威胁情报并对比历史情报，研判高危事件。最后生成用于上报给网信部门的简要报告。",
-		Model:       model,
+		Instruction: `你是一位安全审计专家，需要从 cowrie 数据库中(查询内容时要加 LIMIT，不要全量查询)总结近期威胁情报并对比历史情报，研判高危事件。最后生成用于上报给网信部门的简要报告。
+若攻击中出现了文件落盘/横向移动等操作则判定为高危；若仅有密码爆破，视规模判定低/中危。
+若有正在进行中的攻击，根据攻击频率自行决定是否立即发送报告和下一次醒来查询数据库的时间。
+若攻击已停止，可以完成当前 session 等待下一次被数据源唤醒。`,
+		Model: model,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
 				Tools: tools,
@@ -106,15 +114,31 @@ func main() {
 		},
 	}
 
-	loop := adk.NewTurnLoop(cfg)
+	for {
+		dbtrigger := <-datach
 
-	loop.Push(os.Args[1])
-	loop.Run(ctx) // 非阻塞
-	loop.Stop(adk.UntilIdleFor(8 * time.Hour))
+		loop := adk.NewTurnLoop(cfg)
 
-	result := loop.Wait() // 阻塞至退出
+		loop.Push(fmt.Sprintf("你醒啦：%s", dbtrigger))
+		loop.Run(ctx) // 非阻塞
 
-	if result.ExitReason != nil {
-		log.Print(result.ExitReason)
+		finCtx, cancel := context.WithCancel(ctx)
+
+		go func() {
+			select {
+			case cause := <-finishch:
+				loop.Stop(adk.WithStopCause(cause))
+			case <-finCtx.Done():
+			}
+		}()
+
+		loop.Stop(adk.UntilIdleFor(8 * time.Hour))
+
+		result := loop.Wait() // 阻塞至退出
+		cancel()
+
+		if result.ExitReason != nil {
+			log.Print(result.ExitReason)
+		}
 	}
 }
