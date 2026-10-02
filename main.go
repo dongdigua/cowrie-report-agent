@@ -66,11 +66,13 @@ func main() {
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name:        "cowrie_agent",
-		Description: "A friendly greeting assistant",
-		Instruction: `你是一位安全审计专家，需要从 cowrie 数据库中(查询内容时要加 LIMIT，不要全量查询)总结近期威胁情报并对比历史情报，研判高危事件。最后生成用于上报给网信部门的简要报告。
-若攻击中出现了文件落盘/横向移动等操作则判定为高危；若仅有密码爆破，视规模判定低/中危。
-若有正在进行中的攻击，根据攻击频率自行决定是否立即发送报告和下一次醒来查询数据库的时间。
-若攻击已停止，可以完成当前 session 等待下一次被数据源唤醒。`,
+		Description: "Cowrie 威胁情报研判与上报助手",
+		Instruction: `你是一位安全审计专家，需要从 cowrie 数据库中总结近期威胁情报并按需对比历史情报，研判威胁程度。
+最后生成用于上报给网信部门的简要报告，用 gotify 发送。
+- 若攻击中出现了文件落盘/横向移动等操作则判定为高危；若仅有密码爆破，视规模判定低/中危。
+- 若有正在进行中的攻击，根据攻击频率自行决定是否立即发送报告和是否需要持续观察。
+- 若攻击已停止，可以完成当前 session 等待下一次被数据源唤醒。
+- 查询务必带 LIMIT；需要持续观察时用 sleep 工具`,
 		Model: model,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{

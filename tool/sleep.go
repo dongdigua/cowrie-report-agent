@@ -63,7 +63,7 @@ func SleepErrorHandler(ctx context.Context, err error) string {
 func NewSleepTool(ch <-chan string) tool.BaseTool {
 	t, err := utils.InferTool(
 		"sleep",
-		"睡上一会，阻塞等待被唤醒。",
+		"睡上一会，阻塞等待被唤醒。上限 3h",
 		SleepTool(ch),
 	)
 	if err != nil {

@@ -36,8 +36,13 @@ func PgQuery(pool *pgxpool.Pool) func(context.Context, *PgQueryInput) (*PgQueryO
 		}
 
 		var result [][]any
+		trunc := false
 
 		for rows.Next() {
+			if len(result) >= 101 {
+				trunc = true
+				break
+			}
 			vals, err := rows.Values()
 			if err != nil {
 				return nil, err
@@ -47,12 +52,6 @@ func PgQuery(pool *pgxpool.Pool) func(context.Context, *PgQueryInput) (*PgQueryO
 
 		if err := rows.Err(); err != nil {
 			return nil, err
-		}
-
-		trunc := false
-		if len(result) > 100 {
-			result = result[:100]
-			trunc = true
 		}
 
 		return &PgQueryOutput{Fields: cols, Rows: result, Trunc: trunc}, nil
