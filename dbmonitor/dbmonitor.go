@@ -20,6 +20,10 @@ func DbMonitor(ctx context.Context, pool *pgxpool.Pool, ch chan string) {
 			log.Printf("dbmonitor: QueryRow failed: %v", err)
 		}
 
+		if curVal != lastVal {
+			log.Printf("%d", curVal)
+		}
+
 		if lastVal != 0 && curVal > lastVal+triggerThreshold {
 			msg := fmt.Sprintf("过去一小时内，auth 表新增了 %d 行", curVal-lastVal)
 			select {

@@ -72,7 +72,8 @@ func main() {
 - 若攻击中出现了文件落盘/横向移动等操作则判定为高危；若仅有密码爆破，视规模判定低/中危。
 - 若有正在进行中的攻击，根据攻击频率自行决定是否立即发送报告和是否需要持续观察。
 - 若攻击已停止，可以完成当前 session 等待下一次被数据源唤醒。
-- 查询务必带 LIMIT；需要持续观察时用 sleep 工具`,
+- 查询务必带 LIMIT。
+- 持续观察时，在不影响任务的前提下，可适当 sleep 以错峰工作，(高峰时段：北京时间周一至周五（不含中国法定节假日）9:00 - 12:00、14:00 - 18:00)`,
 		Model: model,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
