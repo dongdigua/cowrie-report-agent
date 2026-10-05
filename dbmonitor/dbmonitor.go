@@ -24,6 +24,12 @@ func DbMonitor(ctx context.Context, pool *pgxpool.Pool, ch chan string) {
 			log.Printf("%d", curVal)
 		}
 
+		if lastVal == 0 {
+			lastVal = curVal
+			time.Sleep(5 * time.Minute)
+			continue
+		}
+
 		if lastVal != 0 && curVal > lastVal+triggerThreshold {
 			msg := fmt.Sprintf("过去一小时内，auth 表新增了 %d 行", curVal-lastVal)
 			select {

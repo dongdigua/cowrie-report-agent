@@ -1,13 +1,13 @@
 package tool
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -28,6 +28,13 @@ type GotifySendOutput struct {
 	OK bool  `json:"ok"`
 }
 
+type gotifyMessage struct {
+	Message  string         `json:"message"`
+	Title    string         `json:"title,omitempty"`
+	Priority int            `json:"priority"`
+	Extras   map[string]any `json:"extras,omitempty"`
+}
+
 // GotifySend posts a message to the Gotify server.
 func GotifySend(serverURL, appToken string) func(context.Context, *GotifySendInput) (*GotifySendOutput, error) {
 	endpoint := strings.TrimRight(serverURL, "/") + "/message"
@@ -38,22 +45,33 @@ func GotifySend(serverURL, appToken string) func(context.Context, *GotifySendInp
 			return nil, fmt.Errorf("标题和正文不能同时为空")
 		}
 
-		form := url.Values{
-			"title":    {in.Title},
-			"message":  {in.Message},
-			"priority": {fmt.Sprintf("%d", in.Priority)},
+		// extras 只在 application/json 请求中生效，用于让客户端按 Markdown 渲染正文。
+		payload := gotifyMessage{
+			Message:  in.Message,
+			Title:    in.Title,
+			Priority: in.Priority,
+			Extras: map[string]any{
+				"client::display": map[string]any{
+					"contentType": "text/markdown",
+				},
+			},
+		}
+
+		body, err := json.Marshal(payload)
+		if err != nil {
+			return nil, err
 		}
 
 		req, err := http.NewRequestWithContext(
 			ctx,
 			http.MethodPost,
 			endpoint,
-			strings.NewReader(form.Encode()),
+			bytes.NewReader(body),
 		)
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Gotify-Key", appToken)
 
 		resp, err := client.Do(req)
@@ -62,13 +80,13 @@ func GotifySend(serverURL, appToken string) func(context.Context, *GotifySendInp
 		}
 		defer resp.Body.Close()
 
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		if err != nil {
 			return nil, err
 		}
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return nil, fmt.Errorf("gotify 返回状态码 %d：%s", resp.StatusCode, strings.TrimSpace(string(body)))
+			return nil, fmt.Errorf("gotify 返回状态码 %d：%s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 		}
 
 		out := &GotifySendOutput{OK: true}
@@ -77,7 +95,7 @@ func GotifySend(serverURL, appToken string) func(context.Context, *GotifySendInp
 		var sent struct {
 			ID int64 `json:"id"`
 		}
-		if json.Unmarshal(body, &sent) == nil {
+		if json.Unmarshal(respBody, &sent) == nil {
 			out.ID = sent.ID
 		}
 
