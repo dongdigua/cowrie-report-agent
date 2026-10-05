@@ -19,7 +19,7 @@ const gotifyHTTPTimeout = 10 * time.Second
 
 type GotifySendInput struct {
 	Title    string `json:"title" jsonschema:"required,description=通知标题"`
-	Message  string `json:"message" jsonschema:"required,description=通知正文（支持 Markdown）"`
+	Message  string `json:"message" jsonschema:"required,description=通知正文（支持 Markdown，不支持表格）"`
 	Priority int    `json:"priority,omitempty" jsonschema:"description=通知优先级，数值越大越重要，默认 0"`
 }
 

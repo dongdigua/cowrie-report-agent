@@ -49,36 +49,38 @@ func main() {
 	}
 
 	datach := make(chan string, 1)
-	finishch := make(chan string)
 
 	go dbmonitor.DbMonitor(ctx, dbpool, datach)
 
 	tools := []tool.BaseTool{
 		agenttool.NewCurrentTimeTool(),
+		agenttool.NewFinishSessionTool(),
 		agenttool.NewSleepTool(datach),
 		agenttool.NewPgQueryTool(dbpool),
 		agenttool.NewGotifySendTool(
 			os.Getenv("GOTIFY_URL"),
 			os.Getenv("GOTIFY_TOKEN"),
 		),
-		agenttool.NewFinishSessionTool(finishch),
 	}
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name:        "cowrie_agent",
 		Description: "Cowrie 威胁情报研判与上报助手",
-		Instruction: `你是一位安全审计专家，需要从 cowrie 数据库中总结近期威胁情报并按需对比历史情报，研判威胁程度。
+		Instruction: `你是一位安全审计专家，需要从 cowrie 数据库中总结近期内网威胁情报并按需对比历史情报，研判威胁程度。
 最后生成用于上报给网信部门的简要报告，用 gotify 发送。
 - 若攻击中出现了文件落盘/横向移动等操作则判定为高危；若仅有密码爆破，视规模判定低/中危。
+- 若有公钥登录尝试，必须提及，并与历史公钥关联。
 - 若有正在进行中的攻击，根据攻击频率自行决定是否立即发送报告和是否需要持续观察。
 - 若攻击已停止，可以完成当前 session 等待下一次被数据源唤醒。
-- 查询务必带 LIMIT。
+- 查询务必带 LIMIT，注意 IP 与 session 的对应关系。
 - sleep 持续观察时，在不影响任务的前提下，可适当以错峰工作(高峰时段：北京时间周一至周五（不含中国法定节假日）9:00 - 12:00、14:00 - 18:00)`,
-		Model: model,
+		Model:         model,
+		MaxIterations: 256,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
 				Tools: tools,
 			},
+			ReturnDirectly: map[string]bool{"finish_session": true},
 		},
 	})
 	if err != nil {
@@ -124,21 +126,8 @@ func main() {
 
 		loop.Push(fmt.Sprintf("你醒啦：%s", dbtrigger))
 		loop.Run(ctx) // 非阻塞
-
-		finCtx, cancel := context.WithCancel(ctx)
-
-		go func() {
-			select {
-			case cause := <-finishch:
-				loop.Stop(adk.WithStopCause(cause))
-			case <-finCtx.Done():
-			}
-		}()
-
 		loop.Stop(adk.UntilIdleFor(8 * time.Hour))
-
 		result := loop.Wait() // 阻塞至退出
-		cancel()
 
 		if result.ExitReason != nil {
 			log.Print(result.ExitReason)

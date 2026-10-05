@@ -13,25 +13,18 @@ type FinishSessionInput struct {
 }
 
 type FinishSessionOutput struct {
-	Finished bool   `json:"finished"`
-	Reason   string `json:"reason,omitempty"`
+	Finished bool `json:"finished"`
 }
 
-func FinishSession(ch chan<- string) func(context.Context, *FinishSessionInput) (*FinishSessionOutput, error) {
-	return func(ctx context.Context, in *FinishSessionInput) (*FinishSessionOutput, error) {
-		select {
-		case ch <- in.Reason:
-		default: // 无人监听时丢弃，避免阻塞当前轮次
-		}
-		return &FinishSessionOutput{Finished: true, Reason: in.Reason}, nil
-	}
+func FinishSession(ctx context.Context, in *FinishSessionInput) (*FinishSessionOutput, error) {
+	return &FinishSessionOutput{Finished: true}, nil
 }
 
-func NewFinishSessionTool(ch chan<- string) tool.BaseTool {
+func NewFinishSessionTool() tool.BaseTool {
 	t, err := utils.InferTool(
 		"finish_session",
 		"结束当前 session：调用后 TurnLoop 将在本轮结束后退出。当研判任务已完成、无需继续运行时使用。",
-		FinishSession(ch),
+		FinishSession,
 	)
 	if err != nil {
 		log.Fatal(err)
