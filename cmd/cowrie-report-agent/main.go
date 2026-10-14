@@ -12,8 +12,8 @@ import (
 	"text/template"
 	"time"
 
-	"cowrie-report-agent/dbmonitor"
-	agenttool "cowrie-report-agent/tool"
+	"cowrie-report-agent/internal/dbmonitor"
+	agenttool "cowrie-report-agent/internal/tool"
 
 	"github.com/joho/godotenv"
 
@@ -87,6 +87,11 @@ func main() {
 			os.Getenv("GOTIFY_URL"),
 			os.Getenv("GOTIFY_TOKEN"),
 		),
+	}
+	if os.Getenv("RPC_SERVER") == "" {
+		log.Println("no RPC_SERVER found! port scanner is disabled")
+	} else {
+		tools = append(tools, agenttool.NewScannerTool())
 	}
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{

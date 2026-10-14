@@ -1,2 +1,4 @@
 .env
 /cowrie-report-agent
+/scanner-rpc
+/main
