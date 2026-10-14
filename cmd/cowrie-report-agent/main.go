@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	"cowrie-report-agent/dbmonitor"
@@ -24,11 +28,33 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+//go:embed prompt
+var prompt string
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
+
+	f, err := os.Open("prompt")
+	defer f.Close()
+	if err == nil {
+		content, err := io.ReadAll(f)
+		if err == nil {
+			prompt = string(content)
+		}
+	}
+
+	tpl, err := template.New("prompt").Parse(prompt)
+	if err != nil {
+		log.Fatalf("Error parsing template %v\n", tpl)
+	}
+
+	var buf bytes.Buffer
+	tpl.Execute(&buf, time.Now().In(agenttool.LoadLocation()).Format("2006-01-02 15:04:05"))
+	prompt = buf.String()
+	// fmt.Println(prompt)
 
 	ctx := context.Background()
 
@@ -42,7 +68,7 @@ func main() {
 		APIKey:          os.Getenv("OPENAI_API_KEY"),
 		Model:           os.Getenv("OPENAI_MODEL"),
 		BaseURL:         os.Getenv("OPENAI_BASE_URL"),
-		ReasoningEffort: openai.ReasoningEffortLevelMedium,
+		ReasoningEffort: openai.ReasoningEffortLevelLow,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -64,16 +90,9 @@ func main() {
 	}
 
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name:        "cowrie_agent",
-		Description: "Cowrie 威胁情报研判与上报助手",
-		Instruction: `你是一位安全审计专家，需要从 cowrie 数据库中总结近期内网威胁情报并按需对比历史情报，研判威胁程度。
-最后生成用于上报给网信部门的简要报告，用 gotify 发送。
-- 若攻击中出现了文件落盘/横向移动等操作则判定为高危；若仅有密码爆破，视规模判定低/中危。
-- 若有公钥登录尝试，必须提及，并与历史公钥关联。
-- 若有正在进行中的攻击，根据攻击频率自行决定是否立即发送报告和是否需要持续观察。
-- 若攻击已停止，可以完成当前 session 等待下一次被数据源唤醒。
-- 查询务必带 LIMIT，注意 IP 与 session 的对应关系。
-- sleep 持续观察时，在不影响任务的前提下，可适当以错峰工作(高峰时段：北京时间周一至周五（不含中国法定节假日）9:00 - 12:00、14:00 - 18:00)`,
+		Name:          "cowrie_agent",
+		Description:   "Cowrie 威胁情报研判与上报助手",
+		Instruction:   prompt,
 		Model:         model,
 		MaxIterations: 256,
 		ToolsConfig: adk.ToolsConfig{
@@ -117,6 +136,25 @@ func main() {
 				prints.Event(event)
 			}
 		},
+	}
+
+	if len(os.Args) > 1 { // one-shot
+		runner := adk.NewRunner(ctx, adk.RunnerConfig{
+			Agent:           agent,
+			EnableStreaming: true,
+		})
+		input := []adk.Message{
+			schema.UserMessage(os.Args[1]),
+		}
+		events := runner.Run(ctx, input)
+		for {
+			event, ok := events.Next()
+			if !ok {
+				break
+			}
+			prints.Event(event)
+		}
+		return
 	}
 
 	for {

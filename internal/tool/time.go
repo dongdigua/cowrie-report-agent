@@ -11,9 +11,9 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 )
 
-var beijing = loadLocation()
+var beijing = LoadLocation()
 
-func loadLocation() *time.Location {
+func LoadLocation() *time.Location {
 	loc, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
 		return time.FixedZone("Asia/Shanghai", 8*3600)
