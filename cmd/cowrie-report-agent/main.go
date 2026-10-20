@@ -43,6 +43,7 @@ func main() {
 		content, err := io.ReadAll(f)
 		if err == nil {
 			prompt = string(content)
+			fmt.Println("local prompt override")
 		}
 	}
 
@@ -68,7 +69,7 @@ func main() {
 		APIKey:          os.Getenv("OPENAI_API_KEY"),
 		Model:           os.Getenv("OPENAI_MODEL"),
 		BaseURL:         os.Getenv("OPENAI_BASE_URL"),
-		ReasoningEffort: openai.ReasoningEffortLevelLow,
+		ReasoningEffort: openai.ReasoningEffortLevel(os.Getenv("OPENAI_REASONING_LEVEL")),
 	})
 	if err != nil {
 		log.Fatal(err)

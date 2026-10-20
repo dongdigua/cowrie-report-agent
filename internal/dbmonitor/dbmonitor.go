@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const triggerThreshold = 100
+const triggerThreshold = 5
 
 func DbMonitor(ctx context.Context, pool *pgxpool.Pool, ch chan string) {
 	lastVal := 0

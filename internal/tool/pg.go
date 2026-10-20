@@ -11,6 +11,8 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 )
 
+const maxRows = 100
+
 type PgQueryInput struct {
 	SQL string `json:"sql" jsonschema:"required,description=要执行的 SQL 语句"`
 }
@@ -18,7 +20,7 @@ type PgQueryInput struct {
 type PgQueryOutput struct {
 	Fields []string `json:"fields"`
 	Rows   [][]any  `json:"rows"`
-	Trunc  bool     `json:"hard_truncated"`
+	Trunc  bool     `json:"truncated"`
 }
 
 func PgQuery(pool *pgxpool.Pool) func(context.Context, *PgQueryInput) (*PgQueryOutput, error) {
@@ -39,7 +41,7 @@ func PgQuery(pool *pgxpool.Pool) func(context.Context, *PgQueryInput) (*PgQueryO
 		trunc := false
 
 		for rows.Next() {
-			if len(result) >= 101 {
+			if len(result) > maxRows {
 				trunc = true
 				break
 			}
@@ -47,6 +49,7 @@ func PgQuery(pool *pgxpool.Pool) func(context.Context, *PgQueryInput) (*PgQueryO
 			if err != nil {
 				return nil, err
 			}
+
 			result = append(result, vals)
 		}
 
