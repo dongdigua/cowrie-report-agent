@@ -2,9 +2,12 @@ package tool
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net"
 	"net/rpc"
 	"os"
+	"time"
 
 	"cowrie-report-agent/internal/scanner"
 
@@ -17,17 +20,33 @@ func Scanner(ctx context.Context, in *scanner.Args) (*scanner.Result, error) {
 		return nil, err
 	}
 
-	var result scanner.Result
-	client, err := rpc.DialHTTP("tcp", os.Getenv("RPC_SERVER"))
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", os.Getenv("RPC_SERVER"))
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
+
+	client := rpc.NewClient(conn)
 	defer client.Close()
 
+	stop := context.AfterFunc(ctx, func() { client.Close() })
+	defer stop()
+
+	var result scanner.Result
 	if err := client.Call("Scanner.Scan", in, &result); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, err
 	}
 	return &result, nil
+}
+
+func ScannerErrorHandler(ctx context.Context, err error) string {
+	return fmt.Sprintf("端口探测失败：%v。", err)
 }
 
 func NewScannerTool() tool.BaseTool {
@@ -39,5 +58,5 @@ func NewScannerTool() tool.BaseTool {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return t
+	return utils.WrapToolWithErrorHandler(t, ScannerErrorHandler)
 }

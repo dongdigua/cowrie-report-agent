@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/netip"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,7 +50,14 @@ func (a *Args) Validate() error {
 	return nil
 }
 
-func (s *Scanner) Scan(args *Args, result *Result) error {
+func (s *Scanner) Scan(args *Args, result *Result) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("scanner: panic recovered: %v\n%s", r, debug.Stack())
+			err = fmt.Errorf("scan panic: %v", r)
+		}
+	}()
+
 	log.Printf("%v\n", args)
 
 	if err := args.Validate(); err != nil {

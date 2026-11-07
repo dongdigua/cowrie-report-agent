@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net"
-	"net/http"
 	"net/rpc"
 	"os"
 
@@ -21,10 +20,9 @@ func main() {
 	if err := rpc.Register(srv); err != nil {
 		log.Fatal("register error:", err)
 	}
-	rpc.HandleHTTP()
 	l, err := net.Listen("tcp", os.Getenv("RPC_LISTEN"))
 	if err != nil {
 		log.Fatal("listen error:", err)
 	}
-	log.Fatal(http.Serve(l, nil))
+	rpc.Accept(l)
 }
