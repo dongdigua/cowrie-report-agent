@@ -1,4 +1,4 @@
-package dbmonitor
+package event
 
 import (
 	"context"

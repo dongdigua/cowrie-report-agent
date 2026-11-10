@@ -12,7 +12,7 @@ import (
 	"text/template"
 	"time"
 
-	"cowrie-report-agent/internal/dbmonitor"
+	"cowrie-report-agent/internal/event"
 	agenttool "cowrie-report-agent/internal/tool"
 
 	"github.com/joho/godotenv"
@@ -77,7 +77,8 @@ func main() {
 
 	datach := make(chan string, 1)
 
-	go dbmonitor.DbMonitor(ctx, dbpool, datach)
+	go event.DbMonitor(ctx, dbpool, datach)
+	go event.Fifo(datach)
 
 	tools := []tool.BaseTool{
 		agenttool.NewCurrentTimeTool(),
@@ -164,11 +165,11 @@ func main() {
 	}
 
 	for {
-		dbtrigger := <-datach
+		trigger := <-datach
 
 		loop := adk.NewTurnLoop(cfg)
 
-		loop.Push(fmt.Sprintf("你醒啦：%s", dbtrigger))
+		loop.Push(fmt.Sprintf("你醒啦：%s", trigger))
 		loop.Run(ctx) // 非阻塞
 		loop.Stop(adk.UntilIdleFor(8 * time.Hour))
 		result := loop.Wait() // 阻塞至退出
