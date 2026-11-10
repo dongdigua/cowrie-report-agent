@@ -52,7 +52,7 @@ func ScannerErrorHandler(ctx context.Context, err error) string {
 func NewScannerTool() tool.BaseTool {
 	t, err := utils.InferTool(
 		"port_scanner",
-		"探测指定 IP 的开放 TCP 端口（1-1024），22 端口开放时返回 SSH 版本号",
+		"探测指定 IP 的开放 TCP 端口（1-1024）并做服务指纹：22 端口返回 SSH 版本号，443 端口返回 TLS 信息",
 		Scanner,
 	)
 	if err != nil {
